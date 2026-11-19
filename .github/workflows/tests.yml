@@ -18,20 +18,24 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned: Playwright's --with-deps supports this image
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: Install
-        run: |
-          pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Install browser system libraries
+        run: python -m playwright install-deps chromium
+
+      - name: Install Chromium
+        run: python -m playwright install chromium
 
       - name: API tests
         run: pytest -m api --junitxml=reports/api.xml --html=reports/api.html --self-contained-html
@@ -46,7 +50,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports
           path: |
