@@ -1,3 +1,6 @@
+import os
+import sys
+
 import pytest
 import requests
 
@@ -10,19 +13,28 @@ def pytest_report_header():
     return f"ParaBank: {BASE_URL}"
 
 
+def stop(config, message: str):
+    """End the run without running tests. On GitHub Actions also add an error annotation."""
+    if os.environ.get("GITHUB_ACTIONS"):
+        with config.pluginmanager.getplugin("capturemanager").global_and_fixture_disabled():
+            sys.stdout.write(f"::error title=ParaBank demo unavailable::{message}\n")
+            sys.stdout.flush()
+    pytest.exit(message, returncode=3)
+
+
 @pytest.fixture(scope="session", autouse=True)
-def demo_site_is_up():
+def demo_site_is_up(pytestconfig):
     """Stop early with a clear message if the shared demo site is down or rate-limiting us,
     so an outage is not reported as a pile of test failures."""
     try:
         r = requests.get(f"{BASE_URL}/index.htm", timeout=TIMEOUT_S)
     except requests.RequestException as e:
-        pytest.exit(f"ParaBank demo site is not reachable ({e}). No tests were run.", returncode=3)
+        stop(pytestconfig, f"ParaBank demo site is not reachable ({e}). No tests were run.")
     if r.status_code == 429:
-        pytest.exit(f"ParaBank demo site is rate-limiting requests (Retry-After: {r.headers.get('Retry-After', '?')} s). "
-                    "No tests were run; try again later.", returncode=3)
+        stop(pytestconfig, f"ParaBank demo site is rate-limiting requests (Retry-After: {r.headers.get('Retry-After', '?')} s). "
+             "No tests were run; try again later.")
     if r.status_code != 200 or "ParaBank" not in r.text:
-        pytest.exit(f"ParaBank demo site is not available (HTTP {r.status_code}). No tests were run.", returncode=3)
+        stop(pytestconfig, f"ParaBank demo site is not available (HTTP {r.status_code}). No tests were run.")
 
 
 @pytest.fixture(scope="session")

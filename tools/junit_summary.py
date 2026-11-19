@@ -1,7 +1,17 @@
-"""Print a Markdown summary of JUnit XML files (used for the GitHub Actions job summary)."""
+"""Report JUnit XML results in GitHub Actions:
+- a Markdown table in the job summary ($GITHUB_STEP_SUMMARY, or stdout when run locally)
+- an error annotation for each failed test, so the reason is visible on the run page and on PRs
+"""
+import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+def one_line(text: str, limit: int = 300) -> str:
+    text = " ".join((text or "").split())
+    return text[:limit] + ("..." if len(text) > limit else "")
+
 
 rows, failed = [], []
 for path in sys.argv[1:]:
@@ -15,14 +25,24 @@ for path in sys.argv[1:]:
         skipped = int(suite.get("skipped", 0))   # includes expected failures (known defects)
         rows.append(f"| {p.stem} | {total} | {total - fail - skipped} | {fail} | {skipped} | {float(suite.get('time', 0)):.0f} s |")
         for case in suite.iter("testcase"):
-            if case.find("failure") is not None or case.find("error") is not None:
-                failed.append(f"- `{case.get('classname')}::{case.get('name')}`")
+            bad = case.find("failure") if case.find("failure") is not None else case.find("error")
+            if bad is not None:
+                name = f"{case.get('classname')}::{case.get('name')}"
+                reason = one_line(bad.get("message") or bad.text)
+                failed.append((name, reason))
 
-print("## Test results\n")
-print("| Suite | Total | Passed | Failed | Skipped / known defects | Time |")
-print("|---|---|---|---|---|---|")
-print("\n".join(rows))
+lines = ["## Test results", "",
+         "| Suite | Total | Passed | Failed | Skipped / known defects | Time |",
+         "|---|---|---|---|---|---|", *rows]
 if failed:
-    print("\n### Failed\n")
-    print("\n".join(failed))
-print("\nReports and Playwright traces of failed tests are in the `test-reports` artifact.")
+    lines += ["", "### Failed", ""] + [f"- `{n}`: {r}" for n, r in failed]
+lines += ["", "Reports and Playwright traces of failed tests are in the `test-reports` artifact."]
+
+summary = os.environ.get("GITHUB_STEP_SUMMARY")
+if summary:
+    with open(summary, "a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    for name, reason in failed:
+        print(f"::error title={name}::{reason}")
+else:
+    print("\n".join(lines))

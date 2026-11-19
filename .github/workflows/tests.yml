@@ -46,7 +46,7 @@ jobs:
 
       - name: Summary
         if: always()
-        run: python tools/junit_summary.py reports/api.xml reports/ui.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python tools/junit_summary.py reports/api.xml reports/ui.xml
 
       - name: Upload reports
         if: always()
