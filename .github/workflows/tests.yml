@@ -1,0 +1,55 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 1 * * 1"   # every Monday 01:00 UTC
+
+# The demo site is shared and rate-limited: never run two test jobs at the same time.
+concurrency:
+  group: parabank-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: API tests
+        run: pytest -m api --junitxml=reports/api.xml --html=reports/api.html --self-contained-html
+
+      - name: UI tests
+        if: success() || failure()
+        run: pytest -m ui --junitxml=reports/ui.xml --html=reports/ui.html --self-contained-html
+
+      - name: Summary
+        if: always()
+        run: python tools/junit_summary.py reports/api.xml reports/ui.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            reports/
+            test-results/
+          retention-days: 14
