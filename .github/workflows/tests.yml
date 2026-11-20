@@ -8,7 +8,7 @@ on:
   schedule:
     - cron: "0 1 * * 1"   # every Monday 01:00 UTC
 
-# The demo site is shared and rate-limited: never run two test jobs at the same time.
+# The demo site is shared and rate-limited: never run two workflow runs at the same time.
 concurrency:
   group: parabank-demo
   cancel-in-progress: false
@@ -16,9 +16,44 @@ concurrency:
 permissions:
   contents: read
 
+# API and UI tests run as two jobs, one after the other. Each job gets a new runner, which
+# spreads the requests to the rate-limited demo site instead of sending them all in one burst.
 jobs:
-  test:
-    runs-on: ubuntu-24.04   # pinned: Playwright's --with-deps supports this image
+  api:
+    name: API tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: API tests
+        run: pytest -m api --junitxml=reports/api.xml --html=reports/api.html --self-contained-html
+
+      - name: Summary
+        if: always()
+        run: python tools/junit_summary.py reports/api.xml
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: api-test-reports
+          path: reports/
+          retention-days: 14
+
+  ui:
+    name: UI tests
+    needs: api
+    if: ${{ !cancelled() }}   # run the UI tests even when API tests fail
+    runs-on: ubuntu-24.04     # pinned: Playwright's install-deps supports this image
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -37,22 +72,18 @@ jobs:
       - name: Install Chromium
         run: python -m playwright install chromium
 
-      - name: API tests
-        run: pytest -m api --junitxml=reports/api.xml --html=reports/api.html --self-contained-html
-
       - name: UI tests
-        if: success() || failure()
         run: pytest -m ui --junitxml=reports/ui.xml --html=reports/ui.html --self-contained-html
 
       - name: Summary
         if: always()
-        run: python tools/junit_summary.py reports/api.xml reports/ui.xml
+        run: python tools/junit_summary.py reports/ui.xml
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: test-reports
+          name: ui-test-reports
           path: |
             reports/
             test-results/

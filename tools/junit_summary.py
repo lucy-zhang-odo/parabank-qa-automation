@@ -36,7 +36,7 @@ lines = ["## Test results", "",
          "|---|---|---|---|---|---|", *rows]
 if failed:
     lines += ["", "### Failed", ""] + [f"- `{n}`: {r}" for n, r in failed]
-lines += ["", "Reports and Playwright traces of failed tests are in the `test-reports` artifact."]
+lines += ["", "Reports and Playwright traces of failed tests are in this job's artifact (Summary page, Artifacts)."]
 
 summary = os.environ.get("GITHUB_STEP_SUMMARY")
 if summary:

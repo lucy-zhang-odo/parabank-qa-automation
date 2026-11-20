@@ -1,25 +1,22 @@
-import os
-import sys
-
 import pytest
 import requests
 
 from parabank.api import ParaBankAPI
 from parabank.config import BASE_URL, TIMEOUT_S
 from parabank.data import Customer, CustomerData, register_customer
+from parabank.http import RateLimitedError
+from parabank.run_control import stop, stop_after_this_test
 
 
 def pytest_report_header():
     return f"ParaBank: {BASE_URL}"
 
 
-def stop(config, message: str):
-    """End the run without running tests. On GitHub Actions also add an error annotation."""
-    if os.environ.get("GITHUB_ACTIONS"):
-        with config.pluginmanager.getplugin("capturemanager").global_and_fixture_disabled():
-            sys.stdout.write(f"::error title=ParaBank demo unavailable::{message}\n")
-            sys.stdout.flush()
-    pytest.exit(message, returncode=3)
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    yield
+    if call.excinfo is not None and call.excinfo.errisinstance(RateLimitedError):
+        stop_after_this_test(item.session, f"{call.excinfo.value} Remaining tests were not run.")
 
 
 @pytest.fixture(scope="session", autouse=True)

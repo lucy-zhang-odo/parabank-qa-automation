@@ -68,13 +68,15 @@ Set `PARABANK_BASE_URL` to test another ParaBank installation, for example a loc
 
 ## CI
 
-GitHub Actions runs API tests, then UI tests, on every push to `main`, on pull requests, every Monday,
-and on demand. Each run shows a result table in the job summary and uploads the HTML reports and
-Playwright traces of failed tests as an artifact. Only one run at a time, to keep the load on the
-demo site low.
+GitHub Actions runs on every push to `main`, on pull requests, every Monday, and on demand. API tests
+and UI tests are two jobs that run one after the other, so the requests to the demo site are spread out.
+Each job shows a result table in its summary and uploads the HTML report (and Playwright traces of
+failed UI tests) as an artifact. A failed test is also shown as an error on the run page with its reason.
+Only one run at a time, to keep the load on the demo site low.
 
 ## Notes
 
 ParaBank is made and hosted by [Parasoft](https://www.parasoft.com/) for testing practice. Test data
 is fake. Because the site is shared, a run can occasionally fail for reasons outside the tests
-(slow responses, site resets); the CI log says when the site was unavailable.
+(slow responses, site resets, rate limiting). If the site is unavailable or starts rate-limiting, the run
+stops at once and says so, instead of reporting every remaining test as failed.

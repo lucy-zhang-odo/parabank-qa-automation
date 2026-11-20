@@ -38,5 +38,8 @@ pytest -m ui --headed  # 看著瀏覽器跑 UI
 
 ## CI
 
-push 到 `main`、PR、每週一與手動觸發時執行；結果表格顯示在 job summary，HTML 報告與失敗測試的
-Playwright trace 會上傳為 artifact。同一時間只跑一個，降低對示範網站的負擔。
+push 到 `main`、PR、每週一與手動觸發時執行。API 與 UI 測試分成兩個 job 先後執行，分散對示範網站的請求。
+每個 job 的 summary 有結果表格，HTML 報告（及 UI 失敗測試的 Playwright trace）上傳為 artifact；
+失敗的測試會連同原因顯示在執行頁上。同一時間只跑一個，降低對示範網站的負擔。
+
+示範網站停擺或開始限流（429）時，測試會立刻停止並說明原因，不會把剩下的測試全部報成失敗。
